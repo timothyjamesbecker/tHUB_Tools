@@ -46,10 +46,7 @@ class Align:
     def edit_dist(self,s1,s2):
         u,v = len(s1),len(s2)
         d = np.zeros((u+1,v+1),dtype='float')
-        #d = [[0 for col in range(v+1)] for row in range(u+1)]
-        #for i in range(0,u+1): d[i][0] = i
         d[:,0] = np.asarray(range(0,u+1),dtype='float')
-        #for j in range(0,v+1): d[0][j] = j
         d[0,:] = np.asarray(range(0,v+1),dtype='float')
         for j in range(1,v+1):
             for i in range(1,u+1):
@@ -67,12 +64,8 @@ class Align:
     # align s1 to s2
     def edit(self,s1,s2): #assumes that s2 is larger if there is difference
         m,n,t = len(s1),len(s2),[]
-        #if m>n: m,n,s1,s2 = n,m,s2,s1
         accum = 0
-        #for i in range(0,n):
-        #    if s2[i] == '-': s1,accum = s1[0:i]+['-']+s1[i+1:],accum+1
         path,cost = self.edit_graph(s1,s2)
-    
         try: #convert this to a nested for loop?
             while m>0 and n>0:
                 if path[m][n]=='M' or path[m][n]=='P':
@@ -101,7 +94,9 @@ class Align:
             else: k,n = 0,[] #three dimensions or some other unknown input
             if sj in n: return np.where(n==sj)[0][0]+1 #ascending rank of nn 1 to k
         return 0  
- 
+    
+        
+    
     # Minimum Sum of Pairs Score with string index i
     # uses an upper bound for the worste minSum as
     # number of seq * longest sequence -> n*m

@@ -13,7 +13,7 @@ def variations(S,k,m,l):
     T = [S]          #new set of sequences made starting at S
     for i in range(0,k):
         t = copy.deepcopy(S)         #copy out S      
-        r = np.random.randint(1,n*l) #pick how many tries on the seq using m
+        r = np.random.randint(1,max(n*l,2)) #pick how many tries on the seq using m
         for x in range(0,r):
             if np.random.binomial(1,m)==1:        #mutation rate success ==1
                 ty = np.random.randint(0,2)       #type of the mutation
@@ -48,16 +48,50 @@ def consensus(A):
         else:      C[j] = k
 
     i = len(C)-1            #trim and right hand
-    while C[i]=='-': i -= 1 #insertion chars
+    while C[i]=='-' and i>0: i -= 1 #insertion chars
     return C[0:i+1]
 
+#resolve directed edges to undirected
+#u@v==v@u
+def edge_seq(A):
+    S = []
+    for i in range(0,len(A)):
+        s = []
+        for j in range(1,len(A[i])):
+            s += ['@'.join([str(A[i][j-1]),str(A[i][j])])]
+        S += [s]
+    return S          
+
+def rev(e):
+    x = e.split('@')
+    return '@'.join(x[::-1])
+            
 #find the preditibilty entropy of
 #A using the amount of repeated patterns
-#def entropy(A):        
+def entropy(A,method):
+    if method=='shannon':
+        F,c = {},0
+        for i in range(0,len(A)):
+            for j in range(0,len(A[i])):
+                if type(A[i][j])==str:
+                    if F.has_key(A[i][j]):        F[A[i][j]]+=1
+                    elif F.has_key(rev(A[i][j])): F[rev(A[i][j])]+=1 
+                    else: F[A[i][j]] = 1
+                    c+=1.0
+                else:
+                    if F.has_key(A[i][j]): F[A[i][j]]+=1
+                    else: F[A[i][j]] = 1
+                    c+=1.0
+        for k in F: F[k] = F[k]/c
+        v = np.asarray(F.values())
+        e = -1*np.sum(v*np.log2(v))
+        return F,e
+    else: return {},0.0
         
+                   
 #run the test code here, this is a dual path tester
-T = [0,0,2,0,0,2,6,0,8,8,8,12]
-L = variations(T,10,0.25,0.5)
+T = [0,0,12,2,10,1,0,0,1,1]
+L = variations(T,10,0.5,0.5)
 #spatial pos for ids 0,1,2,3,4,5,6,7,8,9,10,11,12,13 to do nn on
 pos = np.asarray([[0,0],[0,1],   #0 and 1 are nn
                   [2,0],[2,1],   #2 and 3 are nn
@@ -107,8 +141,8 @@ print('initial string:\t%s'%''.join([str(i).ljust(s+1) for i in T]))
 C = list(consensus(a.s))
 w = {'M':lambda x:0,'I':lambda x:1,'D':lambda x:1,
      'S':lambda x:1, 'P':lambda x:0.5 }
-a = align.Align(w,rp,nn,k)
-e1,e2 = a.edit_dist(T,C),a.edit_dist(T,C[::-1])
+a2 = align.Align(w,rp,nn,k)
+e1,e2 = a.edit_dist(T,C),a2.edit_dist(T,C[::-1])
 if e1<e2:
     error = e1
     print('consensus string:\t%s'%''.join([str(i).ljust(s+1) for i in C]))

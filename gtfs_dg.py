@@ -1,4 +1,4 @@
-#gtfs_dg_v2 v 0.2, 04/16/2014-06/28/2014
+#gtfs_dg_v2 v 0.5, 04/16/2014-07/06/2014
 #Timothy Becker, UCONN/SOE/CSE
 
 import re
@@ -178,6 +178,13 @@ class G:
         self.AM = sparse.csr_matrix(self.AM)
         self.BM = sparse.csr_matrix(self.BM)    
     
+    #accessors of data elements within g.V
+    def get_pos(self,V):
+        xy = []
+        for v in V: xy += [self.V[self.IV[v]]['pos']]
+        return np.asarray(xy,dtype=float)
+            
+    
     #build and return the subgraphs GS given the path set ps
     def subgraphs(self,ps): #list of strings that are the path keys
         GS = {}
@@ -194,29 +201,59 @@ class G:
                 last = new
             GS[p] = {'V':V,'E':E}
         return GS
-
+    
     #cstar alignment
-    def subgraph_align(self,GS,by,method):
-        L = []
-        n = len(GS.keys())
+    def subgraph_align(self,GS,by,method,a):
+        U = [GS[k][by] for k in GS]               #unique vertices
+        U = list(set([j for i in U for j in i]))  #hashed flattened list
+        U = sorted(U)                             #sorted and mapped
+        ki = {U[i]:i for i in range(0,len(U))}    #map forward and
+        ik = {i:U[i] for i in range(0,len(U))}    #in reverse     
+        pos = self.get_pos(U)                     #resolve spatial positions
+        if a>0: nn = distance.ann(pos,a)[1][:,1:] #do a in-route approximate a-nn
+        else:   nn = np.zeros((0,),dtype='float')
+        
+        L,J = [],[]             #L is the original vertice to IV mappings
+        n = len(GS.keys())      #J is the uniquely mapped indecies
         m = max([len(GS[k][by]) for k in GS]) #longest sequence
-        for k in GS: L.append(GS[k][by])
-        s = max([max([len(str(L[i][j])) for j in range(0,len(L[i]))]) for i in range(0,n)])
+        for k in GS:
+            J.append(GS[k][by])
+            L.append([ki[i] for i in GS[k][by]])
+            
+        self.L = L
+        self.U = U
+        self.J = J
+        self.nn = nn
+        self.pos = pos
+        self.ik = ik
+        self.ki = ki
+        
+        s = max([max([len(str(J[i][j])) for j in range(0,len(J[i]))]) for i in range(0,n)])
         if method=='star':
             print('\nApproximating SP score...')
-            T,I,D,R = cs.min_sp(L,0,nn)
+            T,I,D,R = cs.min_sp(L,1,nn) #this has value for reversal
             star = ''.join([str(i).ljust(s+1) for i in L[I]])
             print('\nmin star cost:%s'%T)
             print('min star used:\n'+star+'\n')
             print('\nDuplicating Sequences...')
-            S = copy.deepcopy(L)
+            S = copy.deepcopy(J)
             S2 = copy.deepcopy(L)
             print('\nStarting Alignment...')        
-            S2,cost = cs.star(S2,I,D,R,False) #s aligned list, total cost
+            S2,cost = cs.star(S2,I,D,R,nn) #s aligned list, total cost
+            S1 = []
+            for i in S2:
+                s = []
+                for j in i:
+                   if j=='-': s+=[j]
+                   else:      s+=[ik[j]]
+                S1+=[s]
             print('total cost:%s'%cost)
-            return S,S2,T,I,D
+            return S,S1,T,I,D
         elif method=='suffix':
             return GS,GS,1,0,np.zeros((n,n),dtype=float)
+        else:
+            return GS,GS,1,0,np.zeros((n,n),dtype=float)
+        
     
     def alignment_consensus(self,A,T):
         T,T0,P,K,pi,ip,ki,ik = T #unpack transitions and indexes
@@ -331,7 +368,7 @@ class G:
             j+=1
         x,y = np.asarray(x),np.asarray(y)
         plt.plot(x,y,color='y',lw=2.0,alpha=0.5)
-        #plt.show()
+        plt.show()
     
     def plot(self):
         #draw vertecies

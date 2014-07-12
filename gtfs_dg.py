@@ -10,7 +10,7 @@ import cPickle as pickle
 import scipy.sparse as sparse
 import matplotlib.pylab as plt
 import file_tools
-import cstar_align as cs
+import align
 import distance
 
 class G:
@@ -203,15 +203,20 @@ class G:
         return GS
     
     #cstar alignment
-    def subgraph_align(self,GS,by,method,a):
+    def subgraph_align(self,GS,by,method,a,w,rp):
         U = [GS[k][by] for k in GS]               #unique vertices
         U = list(set([j for i in U for j in i]))  #hashed flattened list
         U = sorted(U)                             #sorted and mapped
         ki = {U[i]:i for i in range(0,len(U))}    #map forward and
-        ik = {i:U[i] for i in range(0,len(U))}    #in reverse     
+        ik = {i:U[i] for i in range(0,len(U))}    #in reverse
+        
+        #set up params
         pos = self.get_pos(U)                     #resolve spatial positions
         if a>0: nn = distance.ann(pos,a)[1][:,1:] #do a in-route approximate a-nn
         else:   nn = np.zeros((0,),dtype='float')
+        print("vertex nn:")
+        print(nn.T[0])
+        A = align.Align(w,rp,nn,a)        
         
         L,J = [],[]             #L is the original vertice to IV mappings
         n = len(GS.keys())      #J is the uniquely mapped indecies
@@ -229,26 +234,19 @@ class G:
         self.ki = ki
         
         s = max([max([len(str(J[i][j])) for j in range(0,len(J[i]))]) for i in range(0,n)])
-        if method=='star':
-            print('\nApproximating SP score...')
-            T,I,D,R = cs.min_sp(L,1,nn) #this has value for reversal
-            star = ''.join([str(i).ljust(s+1) for i in L[I]])
-            print('\nmin star cost:%s'%T)
-            print('min star used:\n'+star+'\n')
-            print('\nDuplicating Sequences...')
+        if method=='cstar':
             S = copy.deepcopy(J)
-            S2 = copy.deepcopy(L)
-            print('\nStarting Alignment...')        
-            S2,cost = cs.star(S2,I,D,R,nn) #s aligned list, total cost
+            print("Done\nComputing Alignment")
+            A.pair(L,'cstar')
             S1 = []
-            for i in S2:
+            for i in A.s:
                 s = []
                 for j in i:
                    if j=='-': s+=[j]
                    else:      s+=[ik[j]]
                 S1+=[s]
-            print('total cost:%s'%cost)
-            return S,S1,T,I,D
+            print('total cost:%s'%A.cost)
+            return S,S1,A.t,A.c,A.d
         elif method=='suffix':
             return GS,GS,1,0,np.zeros((n,n),dtype=float)
         else:

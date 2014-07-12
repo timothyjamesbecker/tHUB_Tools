@@ -18,7 +18,11 @@ for k in x:
     GS = g.subgraphs(g.routes[k])
     start = time.time()
     T = g.subgraph_transition(GS,'V')
-    X,A,C,I,D = g.subgraph_align(GS,'V','star',5)
+    #params
+    w = {'M':lambda x:0,'I':lambda x:1,'D':lambda x:1,
+         'S':lambda x:1, 'P':lambda x:0.5 }
+    rp = 1
+    X,A,C,I,D = g.subgraph_align(GS,'V','cstar',1,w,rp)
     PWM,C = g.alignment_consensus(A,T)
     stop = time.time()
     print("original sequences:")

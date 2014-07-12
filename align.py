@@ -116,6 +116,7 @@ class Align:
         self.c = np.argmin([np.sum(self.d[:,j]) for j in range(0,n)])
         self.t = np.min([np.sum(self.d[:,j]) for j in range(0,n)])
 
+    #pairwise alignment algorithms
     def pair(self,s,method):
         if method=='cstar':
             self.min_sp(s)
@@ -157,3 +158,6 @@ class Align:
                             s[j],cost = self.edit(s[i],s[j])                        
                     accum+=cost
         self.s,self.cost = s,accum
+    
+    #merged alignment algorithms
+    #def merge(self,s,method):

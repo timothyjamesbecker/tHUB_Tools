@@ -51,16 +51,16 @@ def consensus(A):
     while C[i]=='-' and i>0: i -= 1 #insertion chars
     return C[0:i+1]
 
-#resolve directed edges to undirected
-#u@v==v@u
-def edge_seq(A):
+#build kmer subsequences with '@' delimiter
+#a single edge would then be u@v
+def kmer(A,k):
     S = []
     for i in range(0,len(A)):
         s = []
-        for j in range(1,len(A[i])):
-            s += ['@'.join([str(A[i][j-1]),str(A[i][j])])]
+        for j in range(k-1,len(A[i])):
+            s += ['@'.join([str(A[i][l]) for l in range(j-k,j)])]
         S += [s]
-    return S          
+    return S
 
 def rev(e):
     x = e.split('@')

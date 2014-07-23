@@ -3,6 +3,7 @@
 
 import copy
 import numpy as np
+import scipy as sp
 import distance
 import itertools as it
 import time
@@ -14,32 +15,66 @@ class Align:
         self.rp = RP  #reversal penalty
         self.nn = NN  #nearest neighbor index matrix
         self.k = K    #weight parameter for NN to partial P
+    
+    #merge nn if they do not have transitions
+    #def v_merge(self,s):
 
     # compute the edit graph between two strings using
     # the Wagner-Fisher Algorithm and the edit values:
-    #M,P = Match|Partial, I = Insertion, D = Delete, S = Substitution
+    #M,P = Match|Partial, I = Insertion, D = Delete, S = Substitution d
     def edit_graph(self,s1,s2):
         u,v = len(s1),len(s2)
         d = [[0 for col in range(v+1)] for row in range(u+1)]
         b = [['M' for col in range(v+1)] for row in range(u+1)]
         for i in range(0,u+1): d[i][0] = i
         for j in range(0,v+1): d[0][j] = j
+            
         for j in range(1,v+1):
-            for i in range(1,u+1):
-                k = self.nn_rank(s1[i-1],s2[j-1]) #get nn rank
-                min_w = 0==np.argmin([self.w['P'](k),self.w['I'](self.k),self.w['D'](self.k),self.w['S'](self.k)])
+            for i in range(1,u+1):            
+                if s1[i-1] == s2[j-1]:
+                    d[i][j],b[i][j] = d[i-1][j-1], 'M'
+                elif s1[i-1]!='-' and self.nn[s1[i-1]]==s2[j-1]: #1-nn check
+                    d[i][j],b[i][j] = d[i-1][j-1]+ 0.5, 'P' 
+                elif d[i-1][j] <= d[i][j-1] and d[i-1][j] <= d[i-1][j-1]:
+                    d[i][j],b[i][j] = d[i-1][j]+  1, 'D'
+                elif d[i][j-1] <= d[i-1][j-1]:  
+                    d[i][j],b[i][j] = d[i][j-1]+  1, 'I'
+                else:
+                    d[i][j],b[i][j] = d[i-1][j-1]+2, 'S'
+                    
+        """#this version passes the weighting function in           
+        for j in range(1,v+1):
+            for i in range(1,u+1):            
                 if s1[i-1] == s2[j-1]:
                     d[i][j],b[i][j] = d[i-1][j-1]+self.w['M'](self.k), 'M'
-                elif k>0 and min_w:
+                elif s1[i-1]!='-' and self.nn[s1[i-1]]==s2[j-1]:
                     d[i][j],b[i][j] = d[i-1][j-1]+self.w['P'](self.k), 'P' 
                 elif d[i-1][j] <= d[i][j-1] and d[i-1][j] <= d[i-1][j-1]:
                     d[i][j],b[i][j] = d[i-1][j]+  self.w['D'](self.k), 'D'
                 elif d[i][j-1] <= d[i-1][j-1]:  
                     d[i][j],b[i][j] = d[i][j-1]+  self.w['I'](self.k), 'I'
                 else:
-                    d[i][j],b[i][j] = d[i-1][j-1]+self.w['S'](self.k), 'S'
+                    d[i][j],b[i][j] = d[i-1][j-1]+self.w['S'](self.k), 'S'"""
         return b, d[u][v]
-
+        
+    def levenshtein(self,a,b):
+        "Calculates the Levenshtein distance between a and b."
+        n, m = len(a), len(b)
+        if n > m:
+            # Make sure n <= m, to use O(min(n,m)) space
+            a,b = b,a
+            n,m = m,n
+        current = range(n+1)
+        for i in range(1,m+1):
+            previous, current = current, [i]+[0]*n
+            for j in range(1,n+1):
+                add, delete = previous[j]+1, current[j-1]+1
+                change = previous[j-1]
+                if a[j-1] != b[i-1]:
+                    change = change + 1
+                current[j] = min(add, delete, change)
+                
+        return current[n]
     # Wagner-Fisher Edit Distance Algorithm
     # from two strings s1,s2 computes the
     # min # of moves to make s1 into s2
@@ -92,11 +127,9 @@ class Align:
             elif self.nn.ndim==2: 
                 k,n = self.nn.shape[1],self.nn[si,]
             else: k,n = 0,[] #three dimensions or some other unknown input
-            if sj in n: return np.where(n==sj)[0][0]+1 #ascending rank of nn 1 to k
-        return 0  
-    
-        
-    
+            #if sj in n: return np.where(n==sj)[0][0]+1 #ascending rank of nn 1 to k
+        return 0
+
     # Minimum Sum of Pairs Score with string index i
     # uses an upper bound for the worste minSum as
     # number of seq * longest sequence -> n*m
@@ -113,6 +146,7 @@ class Align:
             else:   self.d[j][k],self.r[j][k] = y,True
             self.d[k][j],self.r[k][j],z = self.d[j][k],self.r[j][k],z+1 #symetric, so save time
             if z%1000==0: print '.',
+        print('')
         self.c = np.argmin([np.sum(self.d[:,j]) for j in range(0,n)])
         self.t = np.min([np.sum(self.d[:,j]) for j in range(0,n)])
 
@@ -129,7 +163,7 @@ class Align:
             n,accum,rs = len(s),0,[]
             d,c,r = np.zeros((n,n),dtype=float),0,np.zeros((n,n),dtype='bool')
             self.d,self.c,self.r,self.t = d,c,r,0
-        for i in range(0,n): #align center to next closest from the original
+        for i in range(0,n):
             if i != c:
                 if r[i,c]:
                     if len(s[i])>len(s[c]):
@@ -143,21 +177,24 @@ class Align:
                     else:
                         s[i],cost = self.edit(s[c],s[i])
                 accum+=cost
-            for j in range(0,i): #now align all others to s[c]
+            for j in range(0,n): #now align all others to s[c]
                 if j != i and j != c:
-                    if r[i,j]:
-                        if len(s[j])>len(s[i]):
-                            s[i],cost = self.edit(s[j][::-1],s[i])
+                    if r[c,j]:
+                        if len(s[j])>len(s[c]):
+                            s[c],cost = self.edit(s[j][::-1],s[c])
                         else:
-                            s[j],cost = self.edit(s[i],s[j][::-1])
-                        r[i,j],r[j,i] = 0,0
+                            s[j],cost = self.edit(s[c],s[j][::-1])
+                        r[c,j],r[j,c] = 0,0
                     else:
-                        if len(s[j])>len(s[i]):
-                            s[i],cost = self.edit(s[j],s[i])
+                        if len(s[j])>len(s[c]):
+                            s[c],cost = self.edit(s[j],s[c])
                         else:
-                            s[j],cost = self.edit(s[i],s[j])                        
+                            s[j],cost = self.edit(s[c],s[j])                        
                     accum+=cost
         self.s,self.cost = s,accum
-    
+
+        
+    #def msa(self,s):
+        
     #merged alignment algorithms
     #def merge(self,s,method):

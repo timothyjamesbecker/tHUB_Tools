@@ -247,8 +247,19 @@ class G:
                 S1+=[s]
             print('total cost:%s'%A.cost)
             return S,S1,A.t,A.c,A.d
-        elif method=='suffix':
-            return GS,GS,1,0,np.zeros((n,n),dtype=float)
+        elif method=='rand':
+            S = copy.deepcopy(J)
+            print("Done\nComputing Alignment")
+            A.pair(L,'rand')
+            S1 = []
+            for i in A.s:
+                s = []
+                for j in i:
+                   if j=='-': s+=[j]
+                   else:      s+=[ik[j]]
+                S1+=[s]
+            print('total cost:%s'%A.cost)
+            return S,S1,A.t,A.c,A.d
         else:
             return GS,GS,1,0,np.zeros((n,n),dtype=float)
         
@@ -276,8 +287,8 @@ class G:
         for i in range(0,len(C0)-1):
             if i == 0 or C0[i]=='-' or C0[i+1]=='-': boost = T0[i]
             else: boost = T[pi[C0[i]],ki[C0[i+1]]]
-            if PWM[i][C0[i]]+boost>1.2 and C0[i]!='-' and C0[i] not in C.values():
-                C[i] = C0[i]
+            if PWM[i][C0[i]]+boost>0.5 and C0[i]!='-' and C0[i] not in C.values(): C[i] = C0[i]
+            #if C0[i]!='-' and C0[i] not in C.values(): C[i] = C0[i]
         return PWM,C
                         
     def subgraph_transition(self,GS,by):

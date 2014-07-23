@@ -20,15 +20,15 @@ for k in x:
     T = g.subgraph_transition(GS,'V')
     #params
     w = {'M':lambda x:0,'I':lambda x:1,'D':lambda x:1,
-         'S':lambda x:1, 'P':lambda x:0.5 }
+         'S':lambda x:1, 'P':lambda x:0.1 }
     rp = 1
     X,A,C,I,D = g.subgraph_align(GS,'V','cstar',1,w,rp)
     PWM,C = g.alignment_consensus(A,T)
     stop = time.time()
-    print("original sequences:")
-    g.alignment_print(X)
-    print("aligned sequences:")
-    g.alignment_print(A)
+    #print("original sequences:")
+    #g.alignment_print(X)
+    #print("aligned sequences:")
+    #g.alignment_print(A)
     t+=[(stop-start)]
     print('Total Processing Time was %s seconds\n'%(stop-start))
     g.subgraph_plot(GS)

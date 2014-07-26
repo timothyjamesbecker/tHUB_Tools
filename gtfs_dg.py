@@ -6,12 +6,14 @@ import httplib
 import copy
 import datetime
 import numpy as np
+import itertools as it
 import cPickle as pickle
 import scipy.sparse as sparse
 import matplotlib.pylab as plt
 import file_tools
 import align
 import distance
+import similarity
 
 class G:
     def __init__(self,gtfs_path,g_path):
@@ -186,7 +188,8 @@ class G:
             
     
     #build and return the subgraphs GS given the path set ps
-    def subgraphs(self,ps): #list of strings that are the path keys
+    #should refactor this as route2subgraph or something
+    def subgraph(self,ps): #list of strings that are the path keys
         GS = {}
         if type(ps) != list: ps = list(ps)
         for p in ps: #each string is a key
@@ -201,6 +204,76 @@ class G:
                 last = new
             GS[p] = {'V':V,'E':E}
         return GS
+
+    def subgraph_unique(self,GS,by):
+        U = [GS[k][by] for k in GS]               #unique vertices
+        U = list(set([j for i in U for j in i]))  #hashed flattened list
+        U = sorted(U)                             #sorted and mapped
+        ki = {U[i]:i for i in range(0,len(U))}    #map forward and
+        ik = {i:U[i] for i in range(0,len(U))}    #in reverse
+        return {'ki':ki,'ik':ik}
+
+    def subgraph_sequence(self,GS,by,U):
+        ki,ik = U['ki'],U['ik']
+        L,J = [],[]             #L is the unique mapped, J is the original
+        m = max([len(GS[k][by]) for k in GS]) #longest sequence
+        for k in GS:
+            J.append(GS[k][by])
+            L.append([ki[i] for i in GS[k][by]])
+        return L,J
+    
+    def sequence_vertex_merge(self,S,U,a):
+        ki,ik = U['ki'],U['ik']
+        #if mutual nn and disjoint in GS
+        #do the fast a-nn nn should be set to the sorted key based ki,ik tables
+        pos = self.get_pos(ki.keys())                     #resolve spatial positions
+        if a>0: nn = distance.ann(pos,a)[1][:,1:] #do a in-route approximate a-nn
+        else:   nn = np.zeros((0,),dtype='float') #this can be used to short curcuit nn use
+        #build frequencies of transistions
+        F,c,e = simularity.edge_entropy(S,'shannon')
+        #tally up in and out edges
+        in_f,out_f = {},{}
+        for K in F:
+            p,k = [int(i) for i in K.split('@')]
+            if in_f.has_key(p): in_f[p]+=F[K]
+            else: in_f[p]=F[K]
+            if out_f.has_key(k): out_f[k]+=F[K]
+            else: out_f[k]=F[K]
+        merge = {}
+        pairs = [(j,k) for j,k in it.combinations(range(0,len(ki)),2)]
+        for j,k in pairs:
+            is_mutual_nn = nn[j]==k and nn[k]==j #check for mutal nn
+            #check for connectivity
+            jk = '@'.join([str(j),str(k)])
+            kj = '@'.join([str(k),str(j)])
+            not_connected = not (F.has_key(jk) or F.has_key(kj))
+            if is_mutual_nn and not_connected:
+                x,y = 0,0 #add these for now could do more with flow
+                if in_f.has_key(j): x += in_f[j]
+                if in_f.has_key(k): y += in_f[k]
+                if out_f.has_key(j): x += out_f[j]
+                if out_f.has_key(k): y += out_f[k]
+                if x<y: merge[j]=k
+                else:   merge[k]=j
+        #now loop through the sequence set and if any position 
+        #needs a merge operation, apply the merge:  A[i][j] = merge[k]
+        A = copy.deepcopy(S)
+        for i in range(0,len(A)):
+            for j in range(0,len(A[i])):
+                if merge.has_key(A[i][j]):
+                    A[i][j] = merge[A[i][j]]
+        return {'F':F,'in':in_f,'out':out_f,'merge':merge, 'S':A}
+            
+    #do a pairwise comparison on all unique v or e and return d,r matricies
+    def sequence_simularity(self,S,rp):
+        return simularity.partition_fwd_rev(S,rp)
+        
+    
+    def sequence_median(self,S,p):
+        return simularity.all_median(S,p)
+    
+    #def sequence_align(self):
+        
     
     #cstar alignment
     def subgraph_align(self,GS,by,method,a,w,rp):
@@ -224,14 +297,6 @@ class G:
         for k in GS:
             J.append(GS[k][by])
             L.append([ki[i] for i in GS[k][by]])
-            
-        self.L = L
-        self.U = U
-        self.J = J
-        self.nn = nn
-        self.pos = pos
-        self.ik = ik
-        self.ki = ki
         
         s = max([max([len(str(J[i][j])) for j in range(0,len(J[i]))]) for i in range(0,n)])
         if method=='cstar':
@@ -377,6 +442,21 @@ class G:
             j+=1
         x,y = np.asarray(x),np.asarray(y)
         plt.plot(x,y,color='y',lw=2.0,alpha=0.5)
+        plt.show()
+    
+    def median_plot(self,M,c):
+        x,y = [],[]
+        C0,j = M,0
+        for i in C0:
+            if i!='-':
+                plt.plot(self.V[self.IV[i]]['pos'][0],
+                         self.V[self.IV[i]]['pos'][1],color=c,
+                         marker='.',markersize=20,alpha=0.5)
+                x += [self.V[self.IV[i]]['pos'][0]]
+                y += [self.V[self.IV[i]]['pos'][1]]
+            j+=1
+        x,y = np.asarray(x),np.asarray(y)
+        plt.plot(x,y,color=c,lw=2.0,alpha=0.25)
         plt.show()
     
     def plot(self):

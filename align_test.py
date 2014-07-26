@@ -194,16 +194,17 @@ def test_pair():
 
     return L,a,p    
 
-def fwd_rev_median(A):
-    p = partion_fwd_rev(A,1)
-    fwd,rev = split(A,p[1])
-    fwd_u = [''.join([unichr(i) for i in j]) for j in fwd]
-    rev_u = [''.join([unichr(i) for i in j]) for j in rev]
-    fwd_m = Levenshtein.median(fwd_u)
-    rev_m = Levenshtein.median(rev_u)
+def all_median(A):
+    all_u = [''.join([unichr(i) for i in j]) for j in A]       #convert to UTF-16 0-2^16 range
+    p = partion_fwd_rev(all_u,1)                               #pairwise edit dist partioning
+    fwd_u,rev_u = split(all_u,p[1])                            #split from the r matrix
+    all_m = Levenshtein.median(fwd_u+[i[::-1] for i in rev_u]) #test it on all directions
+    fwd_m = Levenshtein.median(fwd_u)                          #do approximate greedy
+    rev_m = Levenshtein.median(rev_u)                          #median
+    all_med = [ord(i) for i in all_m]
     fwd_med = [ord(i) for i in fwd_m]
     rev_med = [ord(i) for i in rev_m]
-    return fwd_med,rev_med
+    return all_med,fwd_med,rev_med
 
 def split(L,r):
     s = [0,0]
@@ -273,8 +274,10 @@ def partion_fwd_rev(ss,rp):
     pairs = [(j,k) for j,k in it.combinations(range(0,n),2)]
     print('Computing %s Partioning Pairs'%(n*(n-1)/2))
     for j,k in pairs:
-        x = editdistance.eval(ss[j],ss[k])
-        y = editdistance.eval(ss[j],ss[k][::-1])+rp
+        x = Levenshtein.distance(ss[j],ss[k])
+        #x = editdistance.eval(ss[j],ss[k])
+        y = Levenshtein.distance(ss[j],ss[k][::-1])+rp
+        #y = editdistance.eval(ss[j],ss[k][::-1])+rp
         if x<y: d[j][k] = x
         else:   d[j][k],r[j][k] = y,True
         d[k][j],r[k][j],z = d[j][k],r[j][k],z+1 #symetric, so save time

@@ -3,8 +3,8 @@
 import time
 import numpy as np
 import gtfs_dg as dg
-import distance
-import simularity
+import spatial_distance as spd
+import similarity
 
 base = 'HARTFORD'
 path  = '../DATA_GTFS/'+base+'.zip'
@@ -12,7 +12,7 @@ g_path  = '../DATA_GTFS/'+base+'.zip.G.pkl'
 g = dg.G(path,g_path)
 #g.plot()
 
-x = ['1221']#, '1205', '1224', '1221','1222','1205']#, '1222', '1221', '1220', '1205', '1204', '1952', '1206', '1201', '1200', '1203', '1228', '3166', '1223', '4477', '4476', '1199', '4828', '1191', '4827', '4536', '1192', '1195', '1194', '1197', '1196', '1402', '2683', '1212', '1213', '1210', '1211', '1217', '1214', '1215', '1219', '1229', '1934', '1202', '4509', '4508', '1190', '1188', '1189', '1186', '1187', '1184', '1185', '1182', '1183', '1180', '1181', '4826', '4535', '1193']
+x = ['1224']#, '1205', '1224', '1221','1222','1205']#, '1222', '1221', '1220', '1205', '1204', '1952', '1206', '1201', '1200', '1203', '1228', '3166', '1223', '4477', '4476', '1199', '4828', '1191', '4827', '4536', '1192', '1195', '1194', '1197', '1196', '1402', '2683', '1212', '1213', '1210', '1211', '1217', '1214', '1215', '1219', '1229', '1934', '1202', '4509', '4508', '1190', '1188', '1189', '1186', '1187', '1184', '1185', '1182', '1183', '1180', '1181', '4826', '4535', '1193']
 t = []
 for k in x:
     #align one route at a time
@@ -31,15 +31,25 @@ for k in x:
     #print("aligned sequences:")
     #g.alignment_print(A)
     t+=[(stop-start)]
-    print('Total Python Edit Distance Method Time was %s seconds\n'%(t[-1]))
+    #print('Total Python Edit Distance Method Time was %s seconds\n'%(t[-1]))
     #new routines
     start = time.time()
     U = g.subgraph_unique(GS,'V')
-    L,J = g.subgraph_sequence(GS,'V',U)
-    p = g.sequence_simularity(L,1)
+    S,O = g.subgraph_sequence(GS,'V',U) #S is mapped, O is original
+    
+    #[1] clean up vertecies with vertex merge
+    M = g.sequence_vertex_merge(S,U)
+    #S,U = M['S'],M['U']
+    #maybe update the merged vertecies here?
+    #U = g.sequence_unique(M['S'])   #update the unique vertecies
+    #[2] do spatial nn-set diff dist and sequence set dist
+    ssd = g.spatial_set_distance(S,U) #do nn set diff distance matrix
+    p = g.sequence_similarity(S,rp) #do sequence distance matrix
+    
+    #median finding algo
     print('finding medians...')
-    m = g.sequence_median(L,p)
-    ki,ik = U['ki'],U['ik']
+    m = g.sequence_median(S,p)
+    ki,ik = U['ki'],U['ik'] #have to reverse map to get original keys
     med = {'all':[ik[i] for i in m['all']],
            '>':[ik[i] for i in m['>']],
            '<':[ik[i] for i in m['<']]}
@@ -48,13 +58,18 @@ for k in x:
     print('Total Levenshtein Greedy Median Time was %s seconds\n'%(t[-1]))
     g.subgraph_plot(GS)
     #g.consensus_plot(PWM,C)
-    g.median_plot(med['<'],(0.0,0.0,1.0,1.0))
+    g.median_plot(med['>'],(0.0,0.0,1.0,1.0))
 
 #full workflow...
 #[1] non-connected mutual-nn vertex merge
 #[2] pairwise levenshtein edit distance and reversal paritioning
 #[3] AIC clustering on the edit distance -> yeilds a tree
 #[4] use the spatial data with the tree level for clusters
+
+#what distance metric to construct?
+#consider the two-set all pairs euclidian...
+#will be (a+b)*((a+b)-1)/2 complexity for set of length a,b
+
 
 
 """

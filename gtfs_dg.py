@@ -12,7 +12,7 @@ import scipy.sparse as sparse
 import matplotlib.pylab as plt
 import file_tools
 import align
-import distance
+import spatial_distance as spd
 import similarity
 
 class G:
@@ -221,17 +221,47 @@ class G:
             J.append(GS[k][by])
             L.append([ki[i] for i in GS[k][by]])
         return L,J
-    
-    def sequence_vertex_merge(self,S,U,a):
+
+    #given the vertex keys k, returns the pos
+    #and attaches full nn and d matricies
+    def spatial_similarity(self,k):
+        pos = self.get_pos(k)
+        nn = spd.ann(pos,len(k)-1)
+        d = spd.ann2distance(nn)
+        return nn[1][:,1:],d
+
+    #given two point lists, computes the pairwise
+    #L2 distance(using pre computed d) for the set
+    def spatial_set_distance(self,S,U):
+        #use an updated discrete level-based nn rank proportion...
         ki,ik = U['ki'],U['ik']
+        n = len(ki.keys())
+        nn,spd = self.spatial_similarity(ki.keys())
+        ssd = np.zeros((n,n),dtype=float)
+        pairs = [(j,k) for j,k in it.combinations(range(0,len(ki)),2)]
+        for j,k in pairs:
+            x,y = set(S[j]),set(S[k])
+            ssd[j,k] = ssd[k,j] = len(x^y)*1.0/len(x|y)
+        return ssd
+
+    #given the merge rules, updates the unique mappings
+    def unique_update(self,M,U):
+        k_i = U['ki']
+        
+    
+    def sequence_unique(self,S):
+        U = list(set([j for i in S for j in i]))
+        U = sorted(U)
+        return U
+    
+    def sequence_vertex_merge(self,S,U):
+        ki,ik = U['ki'],U['ik']
+        n = len(ki.keys())
+        nn,spd = self.spatial_similarity(ki.keys())
+        #can attach self.nn=nn, self.spd=spd...
+        
         #if mutual nn and disjoint in GS
-        #do the fast a-nn nn should be set to the sorted key based ki,ik tables
-        pos = self.get_pos(ki.keys())                     #resolve spatial positions
-        if a>0: nn = distance.ann(pos,a)[1][:,1:] #do a in-route approximate a-nn
-        else:   nn = np.zeros((0,),dtype='float') #this can be used to short curcuit nn use
-        #build frequencies of transistions
-        F,c,e = simularity.edge_entropy(S,'shannon')
-        #tally up in and out edges
+        F,c,e = similarity.edge_entropy(S,'shannon') #use transistion counts
         in_f,out_f = {},{}
         for K in F:
             p,k = [int(i) for i in K.split('@')]
@@ -239,10 +269,10 @@ class G:
             else: in_f[p]=F[K]
             if out_f.has_key(k): out_f[k]+=F[K]
             else: out_f[k]=F[K]
-        merge = {}
+        merge = {} #vertex merge map
         pairs = [(j,k) for j,k in it.combinations(range(0,len(ki)),2)]
         for j,k in pairs:
-            is_mutual_nn = nn[j]==k and nn[k]==j #check for mutal nn
+            is_mutual_nn = nn[j,0]==k and nn[k,0]==j #check for mutal nn
             #check for connectivity
             jk = '@'.join([str(j),str(k)])
             kj = '@'.join([str(k),str(j)])
@@ -257,20 +287,50 @@ class G:
                 else:   merge[k]=j
         #now loop through the sequence set and if any position 
         #needs a merge operation, apply the merge:  A[i][j] = merge[k]
-        A = copy.deepcopy(S)
+        A,L = copy.deepcopy(S),[]
         for i in range(0,len(A)):
             for j in range(0,len(A[i])):
                 if merge.has_key(A[i][j]):
+                    L+=[A[i][j]]
                     A[i][j] = merge[A[i][j]]
-        return {'F':F,'in':in_f,'out':out_f,'merge':merge, 'S':A}
+        print(ik)
+        print(ki)
+        #update the key to index mappings            
+        L = list(set(L))
+        print(L)
+
+        for l in L:
+            ki.pop(ik[l])
+            ik.pop(l)
+        
+        #remap the indecies of ik
+        for i in range(0,len(ik.keys())):
+            v = ik[ik.keys()[i]] #original id
+            ki[v]=i              #reset the index
+            ik.pop(ik.keys()[i]) #reset the key
+            ik[i]=v              #for ik
+        
+        #now update ki
+        #for k in ki:
+        #    ki[k] = ik[ki[k]]
+        
+        print(ik)
+        print(ki)
+        
+        
+        #ki = {V[i]:i for i in range(0,len(V))} #map forward and
+        #ik = {i:V[i] for i in range(0,len(V))} #in reverse
+        #returns the transistion frequencies, merge list and cleaned copy of seq S
+        return {'F':F,'in':in_f,'out':out_f,'nn':nn,'spd':spd,'merge':merge, 'S':A, 'U':{'ki':ki,'ik':ik}}
+    
             
     #do a pairwise comparison on all unique v or e and return d,r matricies
-    def sequence_simularity(self,S,rp):
-        return simularity.partition_fwd_rev(S,rp)
+    def sequence_similarity(self,S,rp):
+        return similarity.partition_fwd_rev(S,rp)
         
     
     def sequence_median(self,S,p):
-        return simularity.all_median(S,p)
+        return similarity.all_median(S,p)
     
     #def sequence_align(self):
         
@@ -285,7 +345,7 @@ class G:
         
         #set up params
         pos = self.get_pos(U)                     #resolve spatial positions
-        if a>0: nn = distance.ann(pos,a)[1][:,1:] #do a in-route approximate a-nn
+        if a>0: nn = spd.ann(pos,a)[1][:,1:] #do a in-route approximate a-nn
         else:   nn = np.zeros((0,),dtype='float')
         print("vertex nn:")
         print(nn.T[0])

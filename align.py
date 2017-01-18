@@ -4,7 +4,7 @@
 import copy
 import numpy as np
 import scipy as sp
-import distance
+import spatial_distance as distance
 import itertools as it
 import time
 import sys

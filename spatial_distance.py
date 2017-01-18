@@ -86,7 +86,17 @@ def knn(D,k):
 def ann(Q,k):
     kdt = spatial.cKDTree(Q,leafsize=20) #leafsize tunes KDT build time
     return kdt.query(Q,k=k+1,eps=0.0,p=2)  #p=2 => l2 norm
-        
+
+#takes the nn calculation and converts to
+#an nxn redundant distance matrix for n vertecies
+def ann2distance(nn):
+    n = nn[0].shape[0] #get n
+    d = np.zeros((n,n),dtype=float) #this will be the distance matrix
+    for i in range(0,n):
+        for j in range(0,n):
+            d[i][nn[1][i][j]] = nn[0][i][j]
+    return d
+       
 #def boundingbox(Q):
     #find a bounding box that includes all points in set Q
    

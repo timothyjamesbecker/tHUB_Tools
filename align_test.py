@@ -1,5 +1,5 @@
 import align
-import distance
+import spatial_distance as distance
 import copy
 import itertools as it
 import numpy as np

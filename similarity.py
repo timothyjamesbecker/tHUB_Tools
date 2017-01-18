@@ -32,8 +32,11 @@ def all_median(A,p):
     fwd_i,rev_i = split(A,p['r'])                    #split from the r matrix
     fwd_u = [''.join([unichr(i) for i in j]) for j in fwd_i]
     rev_u = [''.join([unichr(i) for i in j]) for j in rev_i]
+    print("all median")
     all_m = lv.median(all_u) #test it on all directions
+    print("fwd median")
     fwd_m = lv.median(fwd_u)
+    print("rev median")
     rev_m = lv.median(rev_u)                        
     print('fwd==rev? %s'%(fwd_m==rev_m))
     all_med = [ord(i) for i in all_m]
@@ -62,6 +65,18 @@ def split(A,r):
     for i in rev_i: rev+=[A[i]]
     return fwd,rev
                            
+def rev(e):
+    x = e.split('@')
+    return '@'.join(x[::-1])
+
+def equal_2d(x,y):
+    if x.shape != y.shape: return [list(i) for i in x]
+    L = []
+    for i in range(0,x.shape[0]):
+        for j in range(0,x.shape[1]):
+            if x[i][j]!=y[i][j]: L+=[[i,j]]
+    return L
+                     
 #find the preditibilty entropy of
 #A using the amount of repeated patterns
 def entropy(A,method):
@@ -83,7 +98,7 @@ def entropy(A,method):
         v = np.asarray(F.values())
         e = -1*np.sum(v*np.log2(v))
         return F,e
-    else: return {},0.0    
+    else: return {},0.0  
 
 #find the edge preditibilty entropy of
 #A using the amount of repeated patterns
